@@ -1,0 +1,83 @@
+# R script for function to calculate HIPE (Gumbs et al. 2020)
+# Function returns a dataframe of HIPE values for each grid cell and a raster object
+
+# input data:
+# 'tree' must be a phylogentic tree of class phylo or phylo4 comprising all species for which HIPE is to be calculated
+# 'cont' must be a dataframe with three columns: "X","Y","species", where each row is the X and Y coordinate for the centroid 
+#     of a grid cell in a species' range. The 'cont' object must contain all grid cells in which a species occurs as individual 
+#     rows and the species in the 'cont' must match the species in the tree object.
+# 'hfp.points' must be a dataframe in the same format as 'cont', with three columnns: (1) "X", (2) "Y" (centroids of grid cells 
+#     in the same projection and resolution as the 'cont' object), and (3) "HFP2009" (the Human Footprint value for each grid cell 
+#     between 0-50).
+# 'categories' must be a dataframe with two columns: (1) "HFP" and (2) "Score", and 51 rows, with the HFP column containing all 
+#     51 HF calues (0-50) and each row of the "Score" column having the corresponding weighting (between 0 and 1) for the HF value 
+#     on the row (e.g. in Gumbs et al. 2019 a HF value of 0 = score of 1, whereas HF of 50 = score of 0.2)
+
+
+HIPE.calc <- function(tree,cont,hfp.points,categories){
+require(phylobase)
+require(sp)
+require(raster)
+  # transform class of phylo
+  if(!class(tree) == "phylo4"){
+    tree3 <- as(tree, "phylo4")
+  }
+  # get data formatted for calculations
+  cont <- cont[cont$species %in% tree$tip.label,]
+  cont$X_Y <- paste(cont$X,"_",cont$Y, sep = "")
+  hfp.points$Cell <- paste(hfp.points$X,hfp.points$Y,sep="_")
+  # convert raw HFP scores to the five classes
+  hfp.points$Score <- NA
+  u_cat <- unique(categories$Score)
+  for(i in 1:length(u_cat)){
+    hfp.points$Score[hfp.points$HFP2009 %in% categories$HFP[categories$Score == u_cat[i]]] <- u_cat[i]
+  }
+  PE.df <- data.frame(Cell = unique(cont$X_Y),Score=NA, PE = 0)
+  # add hfp scores for each grid cell to the pe.df df
+  for(i in 1:length(PE.df$Cell)){
+    PE.df$Score[i] <- hfp.points$Score[hfp.points$Cell == PE.df$Cell[i]]
+    print(paste("Grid cell",i,"of",length(PE.df$Cell),"scored by HFP",sep=" "))
+  }
+  nodes <- descendants(tree3, rootNode(tree3), "all")
+  T_L <- length(tipLabels(tree3))
+  for(i in 1:length(nodes)){
+    if(nodes[i] > T_L){
+      tips <- descendants(tree3, nodes[i], "tips")
+      tip_range <- unique(cont$X_Y[cont$species %in% names(tips)])
+      cell.score <- PE.df[PE.df$Cell %in% tip_range,]
+      tip_range <- sum(cell.score$Score)
+      brlen <- edgeLength(tree3, nodes[i])
+      u.cell <- unique(cell.score$Score)
+      for(k in 1:length(u.cell)){
+        PE.df$PE[PE.df$Cell %in% cell.score$Cell[cell.score$Score == u.cell[k]]] <- 
+          PE.df$PE[PE.df$Cell %in% cell.score$Cell[cell.score$Score == u.cell[k]]] +
+          (brlen*(u.cell[k]/tip_range))
+      }
+    }else if(nodes[i] <= T_L){
+      tip_range <- unique(cont$X_Y[cont$species %in% tipLabels(tree3)[nodes[i]]])
+      cell.score <- PE.df[PE.df$Cell %in% tip_range,]
+      tip_range <- sum(cell.score$Score)
+      brlen <- edgeLength(tree3, nodes[i])
+      u.cell <- unique(cell.score$Score)
+      for(k in 1:length(u.cell)){
+        PE.df$PE[PE.df$Cell %in% cell.score$Cell[cell.score$Score == u.cell[k]]] <- 
+          PE.df$PE[PE.df$Cell %in% cell.score$Cell[cell.score$Score == u.cell[k]]] +
+          (brlen*(u.cell[k]/tip_range))
+      }
+    }
+    print(paste("HIPE calculated for node ",i," of ",length(nodes),"!", sep = ""))
+  }
+  
+  PE.df$X <- unlist(strsplit(as.character(PE.df$Cell), "_"))[seq(1,(length(PE.df$Cell)*2)-1,2)]
+  PE.df$Y <- unlist(strsplit(as.character(PE.df$Cell), "_"))[seq(2,(length(PE.df$Cell)*2),2)]
+  PE.df$X <- as.numeric( PE.df$X )
+  PE.df$Y <- as.numeric( PE.df$Y )
+  PE.2 <- PE.df[,c(3:5)]
+  coordinates(PE.2) <- ~X+Y
+  gridded (PE.2) <- TRUE
+  PEraster <- raster (PE.2)
+  #plot(PEraster)
+  PE.res <- list(PE.df, PEraster)
+  return(PE.res)
+}
+
