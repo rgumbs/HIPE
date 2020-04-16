@@ -1,4 +1,4 @@
-# R script for function to calculate HIPE (Gumbs et al. 2020)
+# R script for function to calculate Human-Impacted Phylogenetic Endemism (HIPE)
 # Function returns a dataframe of HIPE values for each grid cell and a raster object
 
 # input data:
