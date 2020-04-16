@@ -1,0 +1,37 @@
+# R script for function to calculate HITE and TE (Gumbs et al. 2020)
+# Function returns a dataframe of HITE and TE values for each species, along with range size in grid cells and 
+#     Human Pressure weighting across each range
+
+# input data:
+# 'tree' must be a phylogentic tree of class phylo or phylo4 comprising all species for which HIPE is to be calculated
+# 'cont' must be a dataframe with three columns: "X","Y","species", where each row is the X and Y coordinate for the centroid 
+#     of a grid cell in a species' range. The 'cont' object must contain all grid cells in which a species occurs as individual 
+#     rows and the species in the 'cont' must match the species in the tree object.
+# 'hfp.points' must be a dataframe in the same format as 'cont', with three columnns: (1) "X", (2) "Y" (centroids of grid cells 
+#     in the same projection and resolution as the 'cont' object), and (3) "HFP2009" (the Human Footprint value for each grid cell 
+#     between 0-50).
+# 'categories' must be a dataframe with two columns: (1) "HFP" and (2) "Score", and 51 rows, with the HFP column containing all 
+#     51 HF calues (0-50) and each row of the "Score" column having the corresponding weighting (between 0 and 1) for the HF value 
+#     on the row (e.g. in Gumbs et al. 2019 a HF value of 0 = score of 1, whereas HF of 50 = score of 0.2)
+# 'grid.cell.area' must be a numeric representing the area of each grid cell in the analysis HITE and TE will then be 
+#     calculated in this unit of area
+
+
+HITE.calc <- function(tree,cont,hfp.points,categories,grid.cell.area){
+  HITE.df <- data.frame(Species = tree$tip.label, TBL = tree$edge.length[which(tree$edge[,2] <= length(tree$tip.label))], 
+                        Range = NA, Score = NA, TE = NA, HITE = NA)
+  cont$X_Y <- paste(cont$X,"_",cont$Y, sep = "")
+  hfp.points$X_Y <- paste(hfp.points$X,"_",hfp.points$Y,sep="")
+  hfp.points$Score <- NA
+  u_cat <- unique(categories$Score)
+  for(i in 1:length(u_cat)){
+    hfp.points$Score[hfp.points$HFP2009 %in% categories$HFP[categories$Score == u_cat[i]]] <- u_cat[i]
+  }
+  for(i in 1:length(HITE.df$Species)){
+    HITE.df$Range[i] <- length(which(cont$species == HITE.df$Species[i]))
+    HITE.df$Score[i] <- sum(hfp.points$Score[hfp.points$X_Y %in% cont$X_Y[cont$species == HITE.df$Species[i]]])
+  }
+  HITE.df$TE <- (HITE.df$TBL / HITE.df$Range) / grid.cell.area
+  HITE.df$HITE <- (HITE.df$TBL / HITE.df$Score) / grid.cell.area
+  res(HITE.df)
+}
