@@ -1,4 +1,4 @@
-# R script for function to calculate HITE and TE (Gumbs et al. 2020)
+# R script for function to calculate Human-Impacted Terminal Endemism (HITE) and Terminal Endemism (TE) 
 # Function returns a dataframe of HITE and TE values for each species, along with range size in grid cells and 
 #     Human Pressure weighting across each range
 
@@ -33,5 +33,6 @@ HITE.calc <- function(tree,cont,hfp.points,categories,grid.cell.area){
   }
   HITE.df$TE <- (HITE.df$TBL / HITE.df$Range) / grid.cell.area
   HITE.df$HITE <- (HITE.df$TBL / HITE.df$Score) / grid.cell.area
+  print(paste("TE and HITE calculated for",i,"of",length(HITE.df$Species),"species!",sep=" "))
   res(HITE.df)
 }
