@@ -18,7 +18,8 @@
 
 
 HITE.calc <- function(tree,cont,hfp.points,categories,grid.cell.area){
-  HITE.df <- data.frame(Species = tree$tip.label, TBL = tree$edge.length[which(tree$edge[,2] <= length(tree$tip.label))], 
+  HITE.df <- data.frame(Species = tree$tip.label, TBL = tree$edge.length[sapply(c(1:length(tree$tip.label)),
+                                                       function(x,y) which(y==x),y=tree$edge[,2])], 
                         Range = NA, Score = NA, TE = NA, HITE = NA)
   cont$X_Y <- paste(cont$X,"_",cont$Y, sep = "")
   hfp.points$X_Y <- paste(hfp.points$X,"_",hfp.points$Y,sep="")
